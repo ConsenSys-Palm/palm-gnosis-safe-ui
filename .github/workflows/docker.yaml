@@ -1,8 +1,20 @@
+# Docker image is build and pushed for each commit/merge on main branch
+# Docker tag only contain git hash and epoch time for any commit/merge on main branch
+# When a release is released (pre releases won't trigger) docker tag contains tag name as postfix
+# Tag as postfix indicates a production ready docker image and it will be deployed to production
+#
+# On adverse effect on this approach is that, it creates a new images with same commit hash.
+# Risk of having issues is minimum. Better but complex approach would be to query docker registry
+# and check for an image with same git hash and create a new docker tag with existing image for production.
+
 on:
   push:
     branches:
       - main
   pull_request:
+  release:
+    types:
+    - released
 
 jobs:
   docker:
@@ -14,7 +26,13 @@ jobs:
 
       - name: Set Docker Tag
         id: docker-tag
+        if: ${{ github.event_name != 'release' }}
         run: echo "DOCKER_TAG=${GITHUB_SHA:0:7}-$(date +%s)" | tee $GITHUB_ENV
+
+      - name: Set Docker Tag - Release
+        id: docker-tag-release
+        if: ${{ github.event_name == 'release' }}
+        run: echo "DOCKER_TAG=${GITHUB_SHA:0:7}-$(date +%s)-${GITHUB_REF#refs/tags/}" | tee $GITHUB_ENV
 
       - name: Login to Docker Repository
         uses: docker/login-action@v1
